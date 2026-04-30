@@ -1,5 +1,5 @@
 from typing import Optional
-from sqlalchemy import ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, UniqueConstraint
+from sqlalchemy import ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.base import Base
 from typing import TYPE_CHECKING
@@ -12,7 +12,8 @@ class Teachers(Base):
         ForeignKeyConstraint(['u_id'], ['users.u_id'], ondelete='CASCADE', name='teachers_u_id_fkey'),
         PrimaryKeyConstraint('t_id', name='teachers_pkey'),
         UniqueConstraint('employee_code', name='teachers_employee_code_key'),
-        UniqueConstraint('u_id', name='teachers_u_id_key')
+        UniqueConstraint('u_id', name='teachers_u_id_key'),
+        Index('idx_teachers_name', 'name')
     )
 
     t_id: Mapped[int] = mapped_column(Integer, primary_key=True)

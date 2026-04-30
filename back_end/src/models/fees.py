@@ -1,7 +1,7 @@
 import datetime
 import decimal
 from typing import Optional
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKeyConstraint, Integer, Numeric, PrimaryKeyConstraint, String, text
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKeyConstraint, Index, Integer, Numeric, PrimaryKeyConstraint, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.base import Base
 from typing import TYPE_CHECKING
@@ -14,7 +14,9 @@ class Fees(Base):
     __table_args__ = (
         CheckConstraint("status::text = ANY (ARRAY['pending'::character varying, 'paid'::character varying, 'overdue'::character varying]::text[])", name='fees_status_check'),
         ForeignKeyConstraint(['s_id'], ['students.s_id'], ondelete='CASCADE', name='fees_s_id_fkey'),
-        PrimaryKeyConstraint('f_id', name='fees_pkey')
+        PrimaryKeyConstraint('f_id', name='fees_pkey'),
+        Index('idx_fees_s_id', 's_id'),
+        Index('idx_fees_status', 'status')
     )
 
     f_id: Mapped[int] = mapped_column(Integer, primary_key=True)

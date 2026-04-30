@@ -196,18 +196,20 @@ async def get_dashboard_stats_service(db: AsyncSession, user_id: int, role: str)
     q_exams = select(func.count(Examination.ex_id))
     q_attendance = select(func.count(Attendance.a_id))
     q_results = select(func.count(Results.r_id))
+    q_exam_students = select(func.count(ExamsStudents.es_id))
 
     if role == "teacher":
         t_result = await db.execute(select(Teachers).where(Teachers.u_id == user_id))
         teacher = t_result.scalar_one_or_none()
         if not teacher:
-            return {k: 0 for k in ["users", "courses", "fees", "enrollments", "exams", "attendance", "results"]}
+            return {k: 0 for k in ["users", "courses", "fees", "enrollments", "exams", "attendance", "results", "examStudents"]}
         
         tid = teacher.t_id
         q_courses = q_courses.where(Courses.t_id == tid)
         q_enrollments = q_enrollments.join(Courses, Enrollments.c_id == Courses.c_id).where(Courses.t_id == tid)
         q_exams = q_exams.join(Courses, Examination.c_id == Courses.c_id).where(Courses.t_id == tid)
         q_results = q_results.join(ExamsStudents).join(Examination).join(Courses).where(Courses.t_id == tid)
+        q_exam_students = q_exam_students.join(Examination).join(Courses).where(Courses.t_id == tid)
         q_fees = q_fees.join(Enrollments, Fees.s_id == Enrollments.s_id).join(Courses, Enrollments.c_id == Courses.c_id).where(Courses.t_id == tid)
         # For teachers, we usually only care about students in their courses for attendance/users, 
         # but for now we'll keep the counts as requested.
@@ -220,7 +222,8 @@ async def get_dashboard_stats_service(db: AsyncSession, user_id: int, role: str)
         q_enrollments.scalar_subquery().label("enrollments"),
         q_exams.scalar_subquery().label("exams"),
         q_attendance.scalar_subquery().label("attendance"),
-        q_results.scalar_subquery().label("results")
+        q_results.scalar_subquery().label("results"),
+        q_exam_students.scalar_subquery().label("examStudents")
     )
 
     result = await db.execute(final_query)
@@ -233,5 +236,6 @@ async def get_dashboard_stats_service(db: AsyncSession, user_id: int, role: str)
         "enrollments": row.enrollments,
         "exams": row.exams,
         "attendance": row.attendance,
-        "results": row.results
+        "results": row.results,
+        "examStudents": row.examStudents
     }

@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional
-from sqlalchemy import CheckConstraint, Date, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, UniqueConstraint, text
+from sqlalchemy import CheckConstraint, Date, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.base import Base
 from typing import TYPE_CHECKING
@@ -13,7 +13,8 @@ class Examination(Base):
     __tablename__ = 'examination'
     __table_args__ = (
         ForeignKeyConstraint(['c_id'], ['courses.c_id'], ondelete='CASCADE', name='examination_c_id_fkey'),
-        PrimaryKeyConstraint('ex_id', name='examination_pkey')
+        PrimaryKeyConstraint('ex_id', name='examination_pkey'),
+        Index('idx_examination_c_id', 'c_id')
     )
 
     ex_id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -33,7 +34,9 @@ class ExamsStudents(Base):
         ForeignKeyConstraint(['ex_id'], ['examination.ex_id'], ondelete='CASCADE', name='exams_students_ex_id_fkey'),
         ForeignKeyConstraint(['s_id'], ['students.s_id'], ondelete='CASCADE', name='exams_students_s_id_fkey'),
         PrimaryKeyConstraint('es_id', name='exams_students_pkey'),
-        UniqueConstraint('ex_id', 's_id', name='unique_ex_s')
+        UniqueConstraint('ex_id', 's_id', name='unique_ex_s'),
+        Index('idx_exams_students_ex_id', 'ex_id'),
+        Index('idx_exams_students_s_id', 's_id')
     )
 
     es_id: Mapped[int] = mapped_column(Integer, primary_key=True)

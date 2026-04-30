@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional
-from sqlalchemy import DateTime, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, Text, text
+from sqlalchemy import DateTime, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.base import Base
 from typing import TYPE_CHECKING
@@ -14,7 +14,9 @@ class Courses(Base):
     __tablename__ = 'courses'
     __table_args__ = (
         ForeignKeyConstraint(['t_id'], ['teachers.t_id'], ondelete='RESTRICT', name='courses_t_id_fkey'),
-        PrimaryKeyConstraint('c_id', name='courses_pkey')
+        PrimaryKeyConstraint('c_id', name='courses_pkey'),
+        Index('idx_courses_t_id', 't_id'),
+        Index('idx_courses_title', 'title')
     )
 
     c_id: Mapped[int] = mapped_column(Integer, primary_key=True)

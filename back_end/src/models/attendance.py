@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import CheckConstraint, Date, ForeignKeyConstraint, Integer, PrimaryKeyConstraint, String, UniqueConstraint
+from sqlalchemy import CheckConstraint, Date, ForeignKeyConstraint, Index, Integer, PrimaryKeyConstraint, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.db.base import Base
 from typing import TYPE_CHECKING
@@ -12,7 +12,9 @@ class Attendance(Base):
         CheckConstraint("status::text = ANY (ARRAY['Present'::character varying, 'Absent'::character varying, 'Late'::character varying]::text[])", name='attendance_status_check'),
         ForeignKeyConstraint(['e_id'], ['enrollments.e_id'], ondelete='CASCADE', name='attendance_e_id_fkey'),
         PrimaryKeyConstraint('a_id', name='attendance_pkey'),
-        UniqueConstraint('e_id', 'attendance_date', name='unique_attendance')
+        UniqueConstraint('e_id', 'attendance_date', name='unique_attendance'),
+        Index('idx_attendance_e_id', 'e_id'),
+        Index('idx_attendance_date', 'attendance_date')
     )
 
     a_id: Mapped[int] = mapped_column(Integer, primary_key=True)

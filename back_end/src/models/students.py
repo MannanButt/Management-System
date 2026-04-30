@@ -16,7 +16,9 @@ class Students(Base):
         ForeignKeyConstraint(['u_id'], ['users.u_id'], ondelete='CASCADE', name='students_u_id_fkey'),
         PrimaryKeyConstraint('s_id', name='students_pkey'),
         UniqueConstraint('roll_no', name='students_roll_no_key'),
-        Index('idx_students_u_id', 'u_id')
+        Index('idx_students_u_id', 'u_id'),
+        Index('idx_students_name', 'name'),
+        Index('idx_students_class_section', 'class_name', 'section')
     )
 
     s_id: Mapped[int] = mapped_column(Integer, primary_key=True)
