@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users as UsersIcon, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import { getUsers, deleteUser } from '../api/apiService';
 import { useAuth } from '../context/AuthContext';
 
@@ -20,29 +21,56 @@ export default function Users() {
   const [filter, setFilter] = useState(undefined);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
-  const load = async (roleOption, s = '') => {
+  const load = async (roleOption, s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try {
-      const res = await getUsers(roleOption, s);
-      const d = res.data?.data ?? res.data;
+      const skip = (page - 1) * size;
+      const res = await getUsers(roleOption, s, skip, size);
+      const d = res.data?.data ?? [];
+      const total = res.data?.total ?? 0;
+      
       setData(Array.isArray(d) ? d : []);
-    } catch { setData([]); }
+      setTotalItems(total);
+    } catch { 
+      setData([]); 
+      setTotalItems(0);
+    }
     finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1); // Reset to first page on new search
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(filter, debouncedSearch); }, [filter, debouncedSearch]);
+  useEffect(() => { 
+    load(filter, debouncedSearch, currentPage, pageSize); 
+  }, [filter, debouncedSearch, currentPage, pageSize]);
+
+  const handleFilterChange = (val) => {
+    setFilter(val);
+    setCurrentPage(1); // Reset to first page on filter change
+  };
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
     try {
       await deleteUser(id);
-      load(filter, debouncedSearch);
+      load(filter, debouncedSearch, currentPage, pageSize);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to delete user');
     }
@@ -95,13 +123,22 @@ export default function Users() {
             {ROLE_OPTIONS.map(({ label, value }) => (
               <button key={label}
                 className={`btn btn-sm ${filter === value ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setFilter(value)}>{label}</button>
+                onClick={() => handleFilterChange(value)}>{label}</button>
             ))}
           </div>
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
     </div>
   );

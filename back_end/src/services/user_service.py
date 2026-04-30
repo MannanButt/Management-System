@@ -72,7 +72,12 @@ async def create_user_service(user_data: UserRegistration, db: AsyncSession):
 async def read_users_service(role_option: Optional[int], skip: int, limit: int, db: AsyncSession, search: Optional[str] = None, teacher_u_id: Optional[int] = None):
     if role_option is not None and role_option not in [0, 1, 2]: raise error("Invalid role_option.")
     
-    final_results = []
+    # When a specific role is selected, we can paginate directly in the DB query.
+    # When role_option is None (All Users), we must gather ALL matching rows first,
+    # then count total and slice the correct page in Python, because applying
+    # offset/limit to each role query independently gives wrong results.
+    
+    all_results = []
     
     if role_option == 0 or role_option is None:
         query = select(Users, Students).join(Students, Users.u_id == Students.u_id).where(Users.role == 'student')
@@ -86,26 +91,52 @@ async def read_users_service(role_option: Optional[int], skip: int, limit: int, 
 
         if search:
             query = query.where((Students.name.ilike(f"%{search}%")) | (Users.email.ilike(f"%{search}%")) | (Students.roll_no.ilike(f"%{search}%")))
-        query = query.offset(skip).limit(limit)
+        
+        # When a specific role is selected, paginate at DB level
+        if role_option == 0:
+            count_query = select(func.count()).select_from(query.subquery())
+            count_res = await db.execute(count_query)
+            total_count = count_res.scalar_one()
+            results = await db.execute(query.offset(skip).limit(limit))
+            return [merge_user_profile(u, s) for u, s in results.all()], total_count
+        
+        # For "All Users", fetch all matching students (no offset/limit yet)
         results = await db.execute(query)
-        final_results.extend([merge_user_profile(u, s) for u, s in results.all()])
+        all_results.extend([merge_user_profile(u, s) for u, s in results.all()])
             
     if role_option == 1 or role_option is None:
         query = select(Users, Teachers).join(Teachers, Users.u_id == Teachers.u_id).where(Users.role == 'teacher')
         if search:
             query = query.where((Teachers.name.ilike(f"%{search}%")) | (Users.email.ilike(f"%{search}%")) | (Teachers.employee_code.ilike(f"%{search}%")))
-        query = query.offset(skip).limit(limit)
+        
+        if role_option == 1:
+            count_query = select(func.count()).select_from(query.subquery())
+            count_res = await db.execute(count_query)
+            total_count = count_res.scalar_one()
+            results = await db.execute(query.offset(skip).limit(limit))
+            return [merge_user_profile(u, t) for u, t in results.all()], total_count
+        
         results = await db.execute(query)
-        final_results.extend([merge_user_profile(u, t) for u, t in results.all()])
+        all_results.extend([merge_user_profile(u, t) for u, t in results.all()])
  
     if role_option == 2 or role_option is None:
         query = select(Users).where(Users.role == 'admin')
         if search: query = query.where(Users.email.ilike(f"%{search}%"))
-        query = query.offset(skip).limit(limit)
+        
+        if role_option == 2:
+            count_query = select(func.count()).select_from(query.subquery())
+            count_res = await db.execute(count_query)
+            total_count = count_res.scalar_one()
+            results = await db.execute(query.offset(skip).limit(limit))
+            return [{"u_id": u.u_id, "email": u.email, "role": u.role, "created_at": u.created_at} for u in results.scalars().all()], total_count
+        
         results = await db.execute(query)
-        final_results.extend([{"u_id": u.u_id, "email": u.email, "role": u.role, "created_at": u.created_at} for u in results.scalars().all()])
-            
-    return final_results
+        all_results.extend([{"u_id": u.u_id, "email": u.email, "role": u.role, "created_at": u.created_at} for u in results.scalars().all()])
+    
+    # "All Users" mode: total is length of combined results, then slice for the page
+    total_count = len(all_results)
+    paged_results = all_results[skip : skip + limit]
+    return paged_results, total_count
 
 async def read_user_by_id_service(u_id: int, db: AsyncSession):
     result = await db.execute(select(Users).where(Users.u_id == u_id))

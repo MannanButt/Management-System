@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from typing import Optional
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import joinedload
 from src.database import get_db
 from src.models import Examination, Teachers, Courses, Users
@@ -41,7 +41,7 @@ async def create_examination(examination: ExaminationCreate, db: AsyncSession = 
 
 @router.get("/examinations/")
 async def read_examinations(
-    skip: int = 0, limit: int = 100, search: Optional[str] = None,
+    skip: int = 0, limit: int = 5, search: Optional[str] = None,
     db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)
 ):
     query = select(Examination).options(joinedload(Examination.c))
@@ -53,6 +53,11 @@ async def read_examinations(
         query = query.join(Courses, Examination.c_id == Courses.c_id).where(Courses.t_id == teacher.t_id)
     if search:
         query = query.where(Examination.title.ilike(f"%{search}%") | Examination.status.ilike(f"%{search}%"))
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    count_res = await db.execute(count_query)
+    total = count_res.scalar_one()
+
     result = await db.execute(query.offset(skip).limit(limit))
     rows = result.scalars().all()
     data = []
@@ -60,7 +65,7 @@ async def read_examinations(
         item = jsonable_encoder(row)
         item["course_title"] = row.c.title if row.c else "Unknown"
         data.append(item)
-    return response(data=data, message="Examinations retrieved successfully")
+    return response(data=data, total=total, message="Examinations retrieved successfully")
 
 @router.patch("/examinations/{ex_id}/status")
 async def update_examination(ex_id: int, update: ExaminationUpdate, db: AsyncSession = Depends(get_db), auth: Users = Depends(check_admin_or_teacher_role)):

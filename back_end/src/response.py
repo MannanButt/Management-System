@@ -14,15 +14,19 @@ class CustomException(HTTPException):
         self.status_code = status_code
 
 
-def success_response(data=None, message=None, status_code=status.HTTP_200_OK):
+def success_response(data=None, message=None, status_code=status.HTTP_200_OK, total=None):
     """Returns a standardized success JSON response."""
+    content = {
+        "data": jsonable_encoder(data),
+        "succeeded": True,
+        "message": message,
+        "httpStatusCode": status_code,
+    }
+    if total is not None:
+        content["total"] = total
+        
     return JSONResponse(
-        content={
-            "data": jsonable_encoder(data),
-            "succeeded": True,
-            "message": message,
-            "httpStatusCode": status_code,
-        },
+        content=content,
         status_code=status.HTTP_200_OK,
     )
 

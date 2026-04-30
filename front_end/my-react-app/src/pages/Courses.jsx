@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getCourses, createCourse, updateCourse, deleteCourse, getUsers } from '../api/apiService';
@@ -18,23 +19,48 @@ export default function Courses() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
-  const load = async (s = '') => {
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
+
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try { 
-      const [crsRes, tchRes] = await Promise.all([getCourses(s), getUsers(1)]);
-      const d = crsRes.data?.data ?? crsRes.data; 
+      const skip = (page - 1) * size;
+      const [crsRes, tchRes] = await Promise.all([
+        getCourses(s, skip, size), 
+        getUsers(1, '', 0, 1000) // Get many teachers for dropdown
+      ]);
+      const d = crsRes.data?.data ?? []; 
+      const total = crsRes.data?.total ?? 0;
+      
       setData(Array.isArray(d) ? d : []);
+      setTotalItems(total);
       setTeachers(tchRes.data?.data ?? []);
     }
-    catch { setData([]); } finally { setLoading(false); }
+    catch { 
+      setData([]); 
+      setTotalItems(0);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(debouncedSearch); }, [debouncedSearch]);
+  useEffect(() => { 
+    load(debouncedSearch, currentPage, pageSize); 
+  }, [debouncedSearch, currentPage, pageSize]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -47,14 +73,14 @@ export default function Courses() {
       } else {
         await createCourse(payload);
       }
-      setModal(null); setForm({ title: '', description: '', t_id: '' }); load();
+      setModal(null); setForm({ title: '', description: '', t_id: '' }); load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save course.'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this course?')) return;
-    try { await deleteCourse(id); load(); }
+    try { await deleteCourse(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
@@ -115,7 +141,16 @@ export default function Courses() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} onAdd={isAdmin ? () => setModal({ type: 'add' }) : null} addLabel="New Course" />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} onAdd={isAdmin ? () => setModal({ type: 'add' }) : null} addLabel="New Course" />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

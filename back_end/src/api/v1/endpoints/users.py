@@ -17,10 +17,10 @@ async def create_user(user_data: UserRegistration, db: AsyncSession = Depends(ge
     return response(data=data, message="User registered successfully")
 
 @router.get("/users/")
-async def read_users(role_option: Optional[int] = None, skip: int = 0, limit: int = 100, search: Optional[str] = None, db: AsyncSession = Depends(get_db), auth_user: Users = Depends(check_admin_or_teacher_role)):
+async def read_users(role_option: Optional[int] = None, skip: int = 0, limit: int = 5, search: Optional[str] = None, db: AsyncSession = Depends(get_db), auth_user: Users = Depends(check_admin_or_teacher_role)):
     teacher_id = auth_user.u_id if auth_user.role == 'teacher' else None
-    data = await utils.read_users_service(role_option, skip, limit, db, search, teacher_u_id=teacher_id)
-    return response(data=data, message="Users retrieved successfully")
+    data, total = await utils.read_users_service(role_option, skip, limit, db, search, teacher_u_id=teacher_id)
+    return response(data=data, total=total, message="Users retrieved successfully")
 
 @router.get("/users/{u_id}")
 async def read_user(u_id: int, db: AsyncSession = Depends(get_db), admin: Users = Depends(check_admin_role)):

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getAttendance, createAttendance, updateAttendance, deleteAttendance, getAvailableStudentsForAttendance } from '../api/apiService';
@@ -16,27 +17,49 @@ export default function Attendance() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [enrollments, setEnrollments] = useState([]);
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
-  const load = async (s = '') => {
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try { 
+      const skip = (page - 1) * size;
       const [attRes, enrRes] = await Promise.all([
-        getAttendance(s),
-        getAvailableStudentsForAttendance()
+        getAttendance(s, skip, size),
+        getAvailableStudentsForAttendance() // Usually small enough to get all
       ]); 
-      const d = attRes.data?.data ?? attRes.data; 
-      setData(Array.isArray(d) ? d : []); 
+      const d = attRes.data?.data ?? []; 
+      const total = attRes.data?.total ?? 0;
+
+      setData(d); 
+      setTotalItems(total);
       setEnrollments(enrRes.data?.data ?? []);
     }
-    catch { setData([]); } finally { setLoading(false); }
+    catch { 
+      setData([]); 
+      setTotalItems(0);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(debouncedSearch); }, [debouncedSearch]);
+  useEffect(() => { 
+    load(debouncedSearch, currentPage, pageSize); 
+  }, [debouncedSearch, currentPage, pageSize]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -48,14 +71,14 @@ export default function Attendance() {
       } else {
         await createAttendance({ ...form, e_id: Number(form.e_id) });
       }
-      setModal(null); setForm({ e_id: '', attendance_date: '', status: 'Present' }); load(debouncedSearch);
+      setModal(null); setForm({ e_id: '', attendance_date: '', status: 'Present' }); load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save attendance.'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this attendance record?')) return;
-    try { await deleteAttendance(id); load(debouncedSearch); }
+    try { await deleteAttendance(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
@@ -122,7 +145,16 @@ export default function Attendance() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} onAdd={canManage ? () => { setSelectedCourse(''); setModal({ type: 'add' }); } : null} addLabel="Mark Attendance" />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} onAdd={canManage ? () => { setSelectedCourse(''); setModal({ type: 'add' }); } : null} addLabel="Mark Attendance" />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

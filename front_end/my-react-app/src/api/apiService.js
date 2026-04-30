@@ -26,52 +26,52 @@ export const resetPassword = (token, new_password) => api.post('/auth/forgot-pas
 export const getDashboardStats = () => api.get('/dashboard/stats');
 
 // --- USERS ---
-export const getUsers = (role_option, search) => api.get('/users/', { params: { role_option, search } });
+export const getUsers = (role_option, search, skip = 0, limit = 10) => api.get('/users/', { params: { role_option, search, skip, limit } });
 export const getUserById = (id) => api.get(`/users/${id}`);
 export const updateUser = (id, data) => api.patch(`/users/${id}`, data);
 export const deleteUser = (id) => api.delete(`/users/${id}`);
 
 // --- COURSES ---
-export const getCourses = (search) => api.get('/courses/', { params: { search } });
+export const getCourses = (search, skip = 0, limit = 10) => api.get('/courses/', { params: { search, skip, limit } });
 export const createCourse = (data) => api.post('/courses/', data);
 export const updateCourse = (id, data) => api.patch(`/courses/${id}`, data);
 export const deleteCourse = (id) => api.delete(`/courses/${id}`);
 
 // --- FEES ---
-export const getFees = (search) => api.get('/fees/', { params: { search } });
+export const getFees = (search, skip = 0, limit = 10) => api.get('/fees/', { params: { search, skip, limit } });
 export const createFee = (data) => api.post('/fees/', data);
 export const updateFeeStatus = (id, status) => api.patch(`/fees/${id}/status`, { status });
 export const deleteFee = (id) => api.delete(`/fees/${id}`);
 
 // --- ENROLLMENTS ---
-export const getEnrollments = (search) => api.get('/enrollments/', { params: { search } });
+export const getEnrollments = (search, skip = 0, limit = 10) => api.get('/enrollments/', { params: { search, skip, limit } });
 export const createEnrollment = (data) => api.post('/enrollments/', data);
 export const updateEnrollment = (id, data) => api.patch(`/enrollments/${id}`, data);
 export const deleteEnrollment = (id) => api.delete(`/enrollments/${id}`);
 
 // --- EXAMINATIONS ---
-export const getExaminations = (search) => api.get('/examinations/', { params: { search } });
+export const getExaminations = (search, skip = 0, limit = 10) => api.get('/examinations/', { params: { search, skip, limit } });
 export const getAvailableCoursesForExams = () => api.get('/examinations/available-courses');
 export const createExamination = (data) => api.post('/examinations/', data);
 export const updateExamination = (id, data) => api.patch(`/examinations/${id}/status`, data);
 export const deleteExamination = (id) => api.delete(`/examinations/${id}`);
 
 // --- ATTENDANCE ---
-export const getAttendance = (search) => api.get('/attendance/', { params: { search } });
+export const getAttendance = (search, skip = 0, limit = 10) => api.get('/attendance/', { params: { search, skip, limit } });
 export const getAvailableStudentsForAttendance = () => api.get('/attendance/available-students');
 export const createAttendance = (data) => api.post('/attendance/', data);
 export const updateAttendance = (id, data) => api.patch(`/attendance/${id}`, data);
 export const deleteAttendance = (id) => api.delete(`/attendance/${id}`);
 
 // --- EXAMS STUDENTS ---
-export const getExamsStudents = (search) => api.get('/exams-students/', { params: { search } });
+export const getExamsStudents = (search, skip = 0, limit = 10) => api.get('/exams-students/', { params: { search, skip, limit } });
 export const createExamsStudent = (data) => api.post('/exams-students/', data);
 export const updateExamsStudentStatus = (id, data) => api.patch(`/exams-students/${id}/status`, data);
 export const editExamsStudent = (id, data) => api.patch(`/exams-students/${id}/edit`, data);
 export const deleteExamsStudent = (id) => api.delete(`/exams-students/${id}`);
 
 // --- RESULTS ---
-export const getResults = (search) => api.get('/results/', { params: { search } });
+export const getResults = (search, skip = 0, limit = 10) => api.get('/results/', { params: { search, skip, limit } });
 export const createResult = (data) => api.post('/results/', data);
 export const updateResult = (id, data) => api.patch(`/results/${id}`, data);
 export const deleteResult = (id) => api.delete(`/results/${id}`);

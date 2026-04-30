@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Check, X, Trash2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getFees, createFee, updateFeeStatus, deleteFee, getUsers } from '../api/apiService';
@@ -14,6 +15,11 @@ export default function Fees() {
   const [modal, setModal] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
   const [form, setForm] = useState({ 
     s_id: '', 
@@ -34,27 +40,45 @@ export default function Fees() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const load = async (s = '') => {
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try {
-      const feeRes = await getFees(s);
-      setData(feeRes.data?.data ?? []);
+      const skip = (page - 1) * size;
+      const feeRes = await getFees(s, skip, size);
+      const d = feeRes.data?.data ?? [];
+      const total = feeRes.data?.total ?? 0;
+      
+      setData(d);
+      setTotalItems(total);
       
       // Only Admins need the student list to create new fee records
       if (user?.role === 'admin') {
-        const stdRes = await getUsers(0);
+        const stdRes = await getUsers(0, '', 0, 1000);
         setStudents(stdRes.data?.data ?? []);
       }
     }
-    catch { setData([]); } finally { setLoading(false); }
+    catch { 
+      setData([]); 
+      setTotalItems(0);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(debouncedSearch); }, [debouncedSearch, user?.role]);
+  useEffect(() => { 
+    load(debouncedSearch, currentPage, pageSize); 
+  }, [debouncedSearch, currentPage, pageSize, user?.role]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   useEffect(() => {
     if (modal && user?.role === 'student' && user?.profileId) {
@@ -80,7 +104,7 @@ export default function Fees() {
       await createFee(payload);
       setModal(false); 
       setForm({ s_id: '', admission_fee: 0, tuition_fee: 0, library_fee: 0, other_fee: 0, amount: 0, due_date: today, status: 'pending' }); 
-      load(debouncedSearch);
+      load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save fee.'); }
     finally { setSaving(false); }
   };
@@ -88,7 +112,7 @@ export default function Fees() {
   const handleStatusUpdate = async (id, status) => {
     try {
       await updateFeeStatus(id, status);
-      load(debouncedSearch);
+      load(debouncedSearch, currentPage, pageSize);
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to update status');
     }
@@ -96,7 +120,7 @@ export default function Fees() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this fee record?')) return;
-    try { await deleteFee(id); load(debouncedSearch); }
+    try { await deleteFee(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
@@ -157,7 +181,16 @@ export default function Fees() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} onAdd={() => setModal(true)} addLabel="New Fee" />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} onAdd={() => setModal(true)} addLabel="New Fee" />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

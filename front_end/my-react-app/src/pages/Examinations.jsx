@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getExaminations, createExamination, updateExamination, deleteExamination, getCourses, getAvailableCoursesForExams } from '../api/apiService';
@@ -16,27 +17,43 @@ export default function Examinations() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
-  const load = async (s = '') => {
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try {
+      const skip = (page - 1) * size;
       const [exRes, crsRes] = await Promise.all([
-        getExaminations(s), 
-        user?.role === 'admin' ? getAvailableCoursesForExams() : getCourses()
+        getExaminations(s, skip, size), 
+        user?.role === 'admin' ? getAvailableCoursesForExams() : getCourses('', 0, 1000)
       ]);
-      setData(exRes.data?.data ?? []);
+      const d = exRes.data?.data ?? [];
+      const total = exRes.data?.total ?? 0;
+
+      setData(d);
+      setTotalItems(total);
       setCourses(crsRes.data?.data ?? []);
     }
-    catch { setData([]); } finally { setLoading(false); }
+    catch { 
+      setData([]); 
+      setTotalItems(0);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
   useEffect(() => { 
-    load(debouncedSearch); 
+    load(debouncedSearch, currentPage, pageSize); 
     // Check if we came from Courses page with a specific c_id
     const params = new URLSearchParams(window.location.search);
     const c_id = params.get('c_id');
@@ -44,7 +61,12 @@ export default function Examinations() {
       setModal({ type: 'add' });
       setForm(f => ({ ...f, c_id }));
     }
-  }, [debouncedSearch, user?.role]);
+  }, [debouncedSearch, currentPage, pageSize, user?.role]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -57,21 +79,21 @@ export default function Examinations() {
       } else {
         await createExamination(payload);
       }
-      setModal(null); setForm({ title: '', c_id: '', exam_date: '' }); load(debouncedSearch);
+      setModal(null); setForm({ title: '', c_id: '', exam_date: '' }); load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save examination.'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this examination?')) return;
-    try { await deleteExamination(id); load(debouncedSearch); }
+    try { await deleteExamination(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
   const handleStatusChange = async (id, newStatus) => {
     try {
       await updateExamination(id, { status: newStatus });
-      load(debouncedSearch);
+      load(debouncedSearch, currentPage, pageSize);
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to update status');
     }
@@ -146,7 +168,16 @@ export default function Examinations() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

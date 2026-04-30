@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getResults, createResult, updateResult, deleteResult, getExamsStudents } from '../api/apiService';
@@ -24,24 +25,49 @@ export default function Results() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
-  const load = async (s = '') => {
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try { 
-      const [res, esRes] = await Promise.all([getResults(s), getExamsStudents()]);
-      const d = res.data?.data ?? res.data; 
-      setData(Array.isArray(d) ? d : []); 
+      const skip = (page - 1) * size;
+      const [res, esRes] = await Promise.all([
+        getResults(s, skip, size), 
+        getExamsStudents('', 0, 1000)
+      ]);
+      const d = res.data?.data ?? []; 
+      const total = res.data?.total ?? 0;
+
+      setData(d); 
+      setTotalItems(total);
       setExamStudents(esRes.data?.data ?? []);
     }
-    catch { setData([]); } finally { setLoading(false); }
+    catch { 
+      setData([]); 
+      setTotalItems(0);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(debouncedSearch); }, [debouncedSearch]);
+  useEffect(() => { 
+    load(debouncedSearch, currentPage, pageSize); 
+  }, [debouncedSearch, currentPage, pageSize]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -59,14 +85,14 @@ export default function Results() {
       } else {
         await createResult(payload);
       }
-      setModal(null); setForm({ es_id: '', marks_obtained: '', total_marks: '', grade: '' }); load(debouncedSearch);
+      setModal(null); setForm({ es_id: '', marks_obtained: '', total_marks: '', grade: '' }); load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save result.'); }
     finally { setSaving(false); }
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this result?')) return;
-    try { await deleteResult(id); load(debouncedSearch); }
+    try { await deleteResult(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
@@ -127,7 +153,16 @@ export default function Results() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} onAdd={canManage ? () => setModal({ type: 'add' }) : null} addLabel="Add Result" />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} onAdd={canManage ? () => setModal({ type: 'add' }) : null} addLabel="Add Result" />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Check, X, Trash2, Edit2, Search } from 'lucide-react';
 import DataTable from '../components/DataTable';
+import Pagination from '../components/Pagination';
 import Modal from '../components/Modal';
 import { useAuth } from '../context/AuthContext';
 import { getExamsStudents, createExamsStudent, updateExamsStudentStatus, editExamsStudent, deleteExamsStudent, getUsers, getExaminations } from '../api/apiService';
@@ -17,32 +18,52 @@ export default function ExamsStudents() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [pageSize, setPageSize] = useState(5);
 
-  const load = async (s = '') => {
+  const load = async (s = '', page = 1, size = pageSize) => {
     setLoading(true);
     try { 
+      const skip = (page - 1) * size;
       const [esRes, stdRes, exRes] = await Promise.all([
-        getExamsStudents(s).catch(() => ({ data: { data: [] } })),
-        getUsers(0).catch(() => ({ data: { data: [] } })),
-        getExaminations().catch(() => ({ data: { data: [] } }))
+        getExamsStudents(s, skip, size).catch(() => ({ data: { data: [] } })),
+        getUsers(0, '', 0, 1000).catch(() => ({ data: { data: [] } })),
+        getExaminations('', 0, 1000).catch(() => ({ data: { data: [] } }))
       ]);
-      const d = esRes.data?.data ?? esRes.data; 
-      setData(Array.isArray(d) ? d : []); 
+      const d = esRes.data?.data ?? []; 
+      const total = esRes.data?.total ?? 0;
+
+      setData(d); 
+      setTotalItems(total);
       setStudents(stdRes.data?.data ?? []);
       setExams(exRes.data?.data ?? []);
     }
     catch (err) { 
       console.error("Load error:", err);
       setData([]); 
+      setTotalItems(0);
     } finally { setLoading(false); }
   };
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), 500);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+      setCurrentPage(1);
+    }, 500);
     return () => clearTimeout(timer);
   }, [search]);
 
-  useEffect(() => { load(debouncedSearch); }, [debouncedSearch, user?.role]);
+  useEffect(() => { 
+    load(debouncedSearch, currentPage, pageSize); 
+  }, [debouncedSearch, currentPage, pageSize, user?.role]);
+
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const handle = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -56,7 +77,7 @@ export default function ExamsStudents() {
         if (user?.role === 'teacher') payload.status = 'pending';
         await createExamsStudent(payload);
       }
-      setModal(null); setForm({ ex_id: '', s_id: '', status: 'pending' }); load(debouncedSearch);
+      setModal(null); setForm({ ex_id: '', s_id: '', status: 'pending' }); load(debouncedSearch, currentPage, pageSize);
     } catch (err) { setError(err.response?.data?.detail || err.response?.data?.message || 'Failed to save exam registration.'); }
     finally { setSaving(false); }
   };
@@ -64,7 +85,7 @@ export default function ExamsStudents() {
   const handleStatusUpdate = async (id, payload) => {
     try {
       await updateExamsStudentStatus(id, payload);
-      load(debouncedSearch);
+      load(debouncedSearch, currentPage, pageSize);
     } catch (err) {
       alert(err.response?.data?.detail || 'Failed to update status');
     }
@@ -72,7 +93,7 @@ export default function ExamsStudents() {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this exam registration?')) return;
-    try { await deleteExamsStudent(id); load(debouncedSearch); }
+    try { await deleteExamsStudent(id); load(debouncedSearch, currentPage, pageSize); }
     catch (err) { alert(err.response?.data?.message || 'Delete failed'); }
   };
 
@@ -160,7 +181,16 @@ export default function ExamsStudents() {
         </div>
       </div>
       <div className="animate-fade-up-1">
-        <DataTable columns={columns} data={data} loading={loading} onAdd={isAdminOrTeacher ? () => setModal({ type: 'add' }) : null} addLabel="Register Student" />
+        <div className="table-container">
+          <DataTable columns={columns} data={data} loading={loading} onAdd={isAdminOrTeacher ? () => setModal({ type: 'add' }) : null} addLabel="Register Student" />
+          <Pagination 
+            currentPage={currentPage} 
+            totalItems={totalItems} 
+            pageSize={pageSize} 
+            onPageChange={setCurrentPage} 
+            onPageSizeChange={handlePageSizeChange}
+          />
+        </div>
       </div>
 
       {modal && (

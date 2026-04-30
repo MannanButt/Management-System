@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, status
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from src.database import get_db
 from src.models import Courses, Teachers, Users
 from src.schemas.course import CourseCreate, CourseUpdate
@@ -38,7 +38,7 @@ async def create_course(course: CourseCreate, db: AsyncSession = Depends(get_db)
 
 @router.get("/courses/")
 async def read_courses(
-    skip: int = 0, limit: int = 100, search: Optional[str] = None,
+    skip: int = 0, limit: int = 5, search: Optional[str] = None,
     db: AsyncSession = Depends(get_db), current_user: Users = Depends(get_current_user)
 ):
     query = select(Courses)
@@ -50,8 +50,14 @@ async def read_courses(
         query = query.where(Courses.t_id == teacher.t_id)
     if search:
         query = query.where(Courses.title.ilike(f"%{search}%") | Courses.description.ilike(f"%{search}%"))
+    
+    # Count total
+    count_query = select(func.count()).select_from(query.subquery())
+    count_res = await db.execute(count_query)
+    total = count_res.scalar_one()
+
     result = await db.execute(query.offset(skip).limit(limit))
-    return response(data=result.scalars().all(), message="Courses retrieved successfully")
+    return response(data=result.scalars().all(), total=total, message="Courses retrieved successfully")
 
 @router.patch("/courses/{c_id}")
 async def update_course(c_id: int, update: CourseUpdate, db: AsyncSession = Depends(get_db), auth: Users = Depends(check_admin_or_teacher_role)):
